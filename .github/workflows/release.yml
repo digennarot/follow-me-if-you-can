@@ -1,0 +1,31 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set version in module.json from tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          REPO="https://github.com/${GITHUB_REPOSITORY}"
+          jq --arg v "$VERSION" --arg repo "$REPO" --arg tag "$GITHUB_REF_NAME" '
+            .version=$v
+            | .url=$repo
+            | .manifest=($repo+"/releases/latest/download/module.json")
+            | .download=($repo+"/releases/download/"+$tag+"/follow-me-if-you-can.zip")
+            | .changelog=($repo+"/releases/tag/"+$tag)' module.json > module.tmp && mv module.tmp module.json
+      - name: Package
+        run: zip -r follow-me-if-you-can.zip module.json scripts styles languages LICENSE README.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            module.json
+            follow-me-if-you-can.zip

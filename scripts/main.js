@@ -247,37 +247,25 @@ class FollowMeIfYouCan {
     static registerSceneControls(controls) {
         if (!(game.user.isGM || game.settings.get("follow-me-if-you-can", "playerAccess"))) return;
 
-        // v12: controls est un tableau; v13: controls est un objet/record avec clés de groupes
-        const isArrayStructure = Array.isArray(controls);
-
-        // Récupère ou crée le groupe Token selon la version
-        let tokenGroup;
-        if (isArrayStructure) {
-            tokenGroup = controls.find(c => c.name === "token");
-        } else if (controls && typeof controls === "object") {
-            // Noms possibles: token / tokens selon systèmes; privilégier "token"
-            tokenGroup = controls.token || controls.tokens || null;
-        }
-
+        // v13+/v14: controls est un Record de groupes; le groupe des tokens s'appelle "tokens"
+        // ("token" gardé comme repli de sécurité)
+        const tokenGroup = controls?.tokens ?? controls?.token ?? null;
         if (!tokenGroup) return;
 
-        // Normalise le tableau d'outils
-        tokenGroup.tools = tokenGroup.tools || (isArrayStructure ? [] : {});
+        // Les outils sont un Record<string, SceneControlTool>
+        tokenGroup.tools = tokenGroup.tools || {};
 
-        // Fabrique d'outil compatible v12 (array) et v13 (record)
+        // Chaque outil doit avoir un "order" (0 = en haut); on les place à la suite des outils existants
         const addTool = (tool) => {
-            if (Array.isArray(tokenGroup.tools)) {
-                tokenGroup.tools.push(tool);
-            } else if (tokenGroup.tools && typeof tokenGroup.tools === "object") {
-                tokenGroup.tools[tool.name] = tool;
-            }
+            tool.order = Object.keys(tokenGroup.tools).length;
+            tokenGroup.tools[tool.name] = tool;
         };
 
         const startTool = {
             name: "follow",
             title: game.i18n.localize("FOLLOWMEIFYOUCAN.Controls.Start"),
             icon: "fas fa-user-plus",
-            onClick: () => {
+            onChange: () => {
                 if (canvas.tokens.controlled.length === 0) {
                     ui.notifications.warn(game.i18n.localize("FOLLOWMEIFYOUCAN.Notifications.NoActiveToken"));
                     return;
@@ -300,7 +288,7 @@ class FollowMeIfYouCan {
                 name: "stopAllFollowing",
                 title: game.i18n.localize("FOLLOWMEIFYOUCAN.Controls.StopAll"),
                 icon: "fas fa-user-slash",
-                onClick: () => {
+                onChange: () => {
                     showStopFollowingDialog();
                 },
                 button: true,
@@ -538,48 +526,6 @@ function createFloatingControls() {
     controlsContainer.appendChild(startButton);
     controlsContainer.appendChild(stopButton);
     controlsContainer.appendChild(homeButton);
-
-    // Ajouter les boutons dans l'onglet "Outils de token"
-    Hooks.on('renderTokenTools', (app, html) => {
-        const tokenTools = html.find('#token-tools');
-        if (!tokenTools.length) return;
-
-        const tokenButtons = document.createElement('div');
-        tokenButtons.className = 'follow-me-token-buttons';
-        Object.assign(tokenButtons.style, {
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '5px',
-            margin: '5px'
-        });
-
-        // Créer des copies des boutons pour l'onglet token
-        const tokenStartButton = createButton(
-            'fas fa-user-plus',
-            game.i18n.localize("FOLLOWMEIFYOUCAN.Controls.Start"),
-            startButton.onclick
-        );
-        const tokenStopButton = createButton(
-            'fas fa-user-slash',
-            game.i18n.localize("FOLLOWMEIFYOUCAN.Controls.StopAll"),
-            stopButton.onclick
-        );
-
-        // Ajouter un titre pour la section
-        const title = document.createElement('h3');
-        title.textContent = 'Follow Me';
-        title.style.borderBottom = '1px solid #782e22';
-        title.style.marginBottom = '5px';
-        title.style.paddingBottom = '3px';
-        title.style.color = '#b5b3a4';
-        
-        tokenButtons.appendChild(title);
-        tokenButtons.appendChild(tokenStartButton);
-        tokenButtons.appendChild(tokenStopButton);
-
-        // Ajouter les boutons au début de la section des outils de token
-        tokenTools.prepend(tokenButtons);
-    });
 }
 
 // Fonction pour créer les contrôles pour les joueurs
@@ -1101,18 +1047,16 @@ Hooks.on('controlToken', (token, selected) => {
 });
 
 // Classe pour le lien GitHub
-class GitHubLink extends FormApplication {
-    static get defaultOptions() {
-        return mergeObject(super.defaultOptions, {
-            id: "follow-me-github-link",
-            title: "GitHub",
-            template: "templates/settings/menu.html"
-        });
-    }
+// ApplicationV2 (FormApplication / mergeObject global sont dépréciés et retirés progressivement).
+// Le bouton du menu de réglages appelle render() : on ouvre simplement le lien sans afficher de fenêtre.
+class GitHubLink extends foundry.applications.api.ApplicationV2 {
+    static DEFAULT_OPTIONS = {
+        id: "follow-me-github-link"
+    };
 
-    render() {
+    async render() {
         window.open("https://github.com/Frenchy-s-module", "_blank");
-        return null;
+        return this;
     }
 }
 
