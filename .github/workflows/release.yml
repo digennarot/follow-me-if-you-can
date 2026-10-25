@@ -11,7 +11,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Set version in module.json from tag
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
@@ -24,7 +24,7 @@ jobs:
             | .changelog=($repo+"/releases/tag/"+$tag)' module.json > module.tmp && mv module.tmp module.json
       - name: Package
         run: zip -r follow-me-if-you-can.zip module.json scripts styles languages LICENSE README.md
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: |
             module.json
